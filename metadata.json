@@ -1,0 +1,6 @@
+{
+  "name": "Semillas del Reino - Sistema de Gestión",
+  "description": "Plataforma administrativa integral y minimalista para el centro educativo Semillas del Reino: control de alumnos, horarios, pagos y sedes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
