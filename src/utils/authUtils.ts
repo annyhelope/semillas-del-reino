@@ -2,8 +2,43 @@ import { AuthUser } from '../types';
 
 export const AUTH_USERS_KEY = 'semillas_auth_users_v1';
 export const AUTH_SESSION_KEY = 'semillas_auth_session_v1';
+export const AUTH_REQUIRED_KEY = 'semillas_auth_required_v1';
 export const MAX_ALLOWED_ACCOUNTS = 2;
 const SALT = 'semillas_del_reino_2026_salt_';
+
+export const DEFAULT_OWNER_USER: AuthUser = {
+  id: 'owner_principal',
+  username: 'propietario',
+  name: 'Dirección General (Propietario)',
+  role: 'owner',
+  passwordHash: '',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  lastLogin: new Date().toISOString(),
+};
+
+/**
+ * Checks if mandatory login screen is enabled.
+ * Defaults to false so user has full, immediate access without blockers or data loss.
+ */
+export function isAuthRequired(): boolean {
+  try {
+    const raw = localStorage.getItem(AUTH_REQUIRED_KEY);
+    return raw === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Enables or disables mandatory login screen on app start
+ */
+export function setAuthRequired(required: boolean): void {
+  try {
+    localStorage.setItem(AUTH_REQUIRED_KEY, required ? 'true' : 'false');
+  } catch (err) {
+    console.error('Error saving auth requirement', err);
+  }
+}
 
 /**
  * Generates a SHA-256 hash for secure client-side password verification
@@ -66,16 +101,27 @@ export function saveStoredUsers(users: AuthUser[]): void {
 export function getCurrentSession(): AuthUser | null {
   try {
     const raw = localStorage.getItem(AUTH_SESSION_KEY);
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    if (!session || !session.id) return null;
+    if (raw) {
+      const session = JSON.parse(raw);
+      if (session && session.id) {
+        const users = getStoredUsers();
+        const found = users.find((u) => u.id === session.id);
+        return found || session;
+      }
+    }
 
-    // Verify user still exists in registered accounts
-    const users = getStoredUsers();
-    const found = users.find((u) => u.id === session.id);
-    return found || null;
-  } catch {
+    // If login is not strictly enforced, allow direct owner access without friction
+    if (!isAuthRequired()) {
+      const users = getStoredUsers();
+      if (users.length > 0) {
+        return users[0];
+      }
+      return DEFAULT_OWNER_USER;
+    }
+
     return null;
+  } catch {
+    return isAuthRequired() ? null : DEFAULT_OWNER_USER;
   }
 }
 

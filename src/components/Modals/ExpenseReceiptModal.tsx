@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { ExpenseRecord, Sede } from '../../types';
 import { formatSoles } from '../../utils/dateUtils';
 import { LogoSemillas } from '../LogoSemillas';
-import { X, Printer, Download, Image as ImageIcon, Loader2, Check, FileSpreadsheet } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { X, Printer, Download, Image as ImageIcon, Loader2, Check, FileText } from 'lucide-react';
+import { 
+  ExpenseVoucherData, 
+  downloadExpenseVoucherImage, 
+  downloadExpenseVoucherPdf 
+} from '../../utils/receiptGenerator';
 
 interface ExpenseReceiptModalProps {
   expense: ExpenseRecord | null;
@@ -17,7 +21,8 @@ export const ExpenseReceiptModal: React.FC<ExpenseReceiptModalProps> = ({
   onClose,
 }) => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
 
   if (!expense) return null;
 
@@ -36,42 +41,55 @@ export const ExpenseReceiptModal: React.FC<ExpenseReceiptModalProps> = ({
     otros: 'Gasto Operativo General',
   };
 
+  const voucherData: ExpenseVoucherData = {
+    voucherNum,
+    date: expense.date,
+    categoryLabel: categoryLabels[expense.category] || expense.category,
+    beneficiaryName: expense.beneficiaryName,
+    description: expense.description,
+    paymentMethod: expense.paymentMethod,
+    receiptNumber: expense.receiptNumber,
+    notes: expense.notes,
+    amount: expenseAmount,
+    sedeName,
+    sedeAddress,
+  };
+
   const handlePrint = () => {
     try {
       window.print();
     } catch {
-      alert('La vista previa no permite impresión directa. Te recomendamos usar el botón "Descargar Comprobante (PNG)".');
+      handleDownloadPdf();
     }
   };
 
   const handleDownloadImage = async () => {
-    const element = document.getElementById('printable-expense-voucher-area');
-    if (!element) {
-      alert('No se pudo encontrar el comprobante para generar la imagen.');
-      return;
-    }
-
     try {
       setIsGeneratingImage(true);
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-      });
-
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `comprobante_egreso_${voucherNum}_${expense.beneficiaryName.replace(/\s+/g, '_')}.png`;
-      link.href = dataUrl;
-      link.click();
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 3500);
+      setDownloadSuccessMsg(null);
+      await downloadExpenseVoucherImage(voucherData);
+      setDownloadSuccessMsg('¡Imagen descargada!');
+      setTimeout(() => setDownloadSuccessMsg(null), 3500);
     } catch (err) {
       console.error('Error al generar imagen de egreso:', err);
-      alert('Ocurrió un inconveniente al generar la imagen. Puedes usar la opción de imprimir.');
+      alert('Ocurrió un inconveniente al generar la imagen. Puedes descargar el comprobante en PDF.');
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      setDownloadSuccessMsg(null);
+      await downloadExpenseVoucherPdf(voucherData);
+      setDownloadSuccessMsg('¡PDF descargado!');
+      setTimeout(() => setDownloadSuccessMsg(null), 3500);
+    } catch (err) {
+      console.error('Error al generar PDF de egreso:', err);
+      alert('Ocurrió un inconveniente al generar el PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -83,7 +101,7 @@ export const ExpenseReceiptModal: React.FC<ExpenseReceiptModalProps> = ({
         aria-modal="true"
       >
         {/* Actions Bar (No se imprime) */}
-        <div className="bg-[#FAF7F2] p-4 border-b border-[#E8E1D5] flex items-center justify-between print:hidden">
+        <div className="bg-[#FAF7F2] p-4 border-b border-[#E8E1D5] flex flex-wrap items-center justify-between gap-2 print:hidden">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md">
               Vale de Egreso Oficial
@@ -91,7 +109,22 @@ export const ExpenseReceiptModal: React.FC<ExpenseReceiptModalProps> = ({
             <span className="text-xs text-[#71685B] font-mono">{voucherNum}</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-amber-800 hover:bg-amber-900 px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Descargar comprobante en documento PDF"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileText className="w-3.5 h-3.5" />
+              )}
+              <span>{isGeneratingPdf ? 'Generando...' : 'Descargar PDF'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleDownloadImage}
@@ -101,18 +134,18 @@ export const ExpenseReceiptModal: React.FC<ExpenseReceiptModalProps> = ({
             >
               {isGeneratingImage ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
-              ) : downloadSuccess ? (
+              ) : downloadSuccessMsg ? (
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
               ) : (
                 <ImageIcon className="w-3.5 h-3.5 text-amber-700" />
               )}
-              <span>{downloadSuccess ? '¡Descargado!' : 'Descargar PNG'}</span>
+              <span>{downloadSuccessMsg || 'Descargar PNG'}</span>
             </button>
 
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-amber-700 hover:bg-amber-800 px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-bold text-[#3B342A] bg-[#EFE8DE] hover:bg-[#E5DDCF] px-3 py-1.5 rounded-xl transition-all cursor-pointer"
               title="Imprimir vale de caja"
             >
               <Printer className="w-3.5 h-3.5" />

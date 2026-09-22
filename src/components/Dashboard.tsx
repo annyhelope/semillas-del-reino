@@ -5,6 +5,7 @@ import {
   ScheduleClass,
   PaymentRecord,
   ExpenseRecord,
+  AdditionalIncomeRecord,
   StaffMember,
   SedeId,
   Sede,
@@ -41,6 +42,7 @@ interface DashboardProps {
   evaluations: FreeEvaluationAppointment[];
   classes: ScheduleClass[];
   payments: PaymentRecord[];
+  additionalIncomes?: AdditionalIncomeRecord[];
   expenses?: ExpenseRecord[];
   staff?: StaffMember[];
   selectedSede: SedeId | 'todas';
@@ -60,6 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   evaluations,
   classes,
   payments,
+  additionalIncomes = [],
   expenses = [],
   staff = [],
   selectedSede,
@@ -102,10 +105,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return student?.sede === selectedSede;
   });
 
+  const filteredAdditional = (additionalIncomes || []).filter((inc) => {
+    if (selectedSede === 'todas') return true;
+    return inc.sede === selectedSede;
+  });
+
   // Calculate stats
   const monthlyCollected = filteredPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+  const additionalCollected = filteredAdditional.reduce((acc, inc) => acc + (Number(inc.amount) || 0), 0);
+  const totalRevenue = monthlyCollected + additionalCollected;
   const totalExpenses = (expenses || []).reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-  const netBalance = monthlyCollected - totalExpenses;
+  const netBalance = totalRevenue - totalExpenses;
   const teacherPayroll = (expenses || [])
     .filter((e) => e.category === 'profesores')
     .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);

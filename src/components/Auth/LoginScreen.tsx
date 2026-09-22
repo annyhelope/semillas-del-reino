@@ -6,6 +6,8 @@ import {
   authenticate,
   createOwnerAccount,
   MAX_ALLOWED_ACCOUNTS,
+  DEFAULT_OWNER_USER,
+  saveCurrentSession
 } from '../../utils/authUtils';
 import {
   Lock,
@@ -16,6 +18,7 @@ import {
   AlertCircle,
   KeyRound,
   Sparkles,
+  ArrowRight
 } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -27,13 +30,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const isFirstSetup = existingUsers.length === 0;
 
   // Form states
-  const [username, setUsername] = useState(isFirstSetup ? 'annyhelo.pe@gmail.com' : '');
+  const [username, setUsername] = useState(isFirstSetup ? 'propietario' : '');
   const [fullName, setFullName] = useState(isFirstSetup ? 'Dirección General - Semillas del Reino' : '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleDirectAccess = () => {
+    const userToUse = existingUsers.length > 0 ? existingUsers[0] : DEFAULT_OWNER_USER;
+    saveCurrentSession(userToUse);
+    onLoginSuccess(userToUse);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,6 +277,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   <span>Iniciar Sesión en el Sistema</span>
                 </>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDirectAccess}
+              className="w-full py-2.5 px-4 bg-[#FAF7F2] hover:bg-[#F2ECE1] border border-[#DDD4C7] text-[#4A4135] font-bold text-xs rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Acceso Rápido / Continuar sin Contraseña</span>
+              <ArrowRight className="w-3.5 h-3.5 text-rose-700" />
             </button>
           </form>
 

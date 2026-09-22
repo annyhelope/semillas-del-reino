@@ -4,6 +4,7 @@ import {
   SedeId, 
   PaymentRecord, 
   ExpenseRecord,
+  AdditionalIncomeRecord,
   FreeEvaluationAppointment, 
   ScheduleClass, 
   StaffMember, 
@@ -38,12 +39,11 @@ import { EvaluationModal } from './components/Modals/EvaluationModal';
 import { ScheduleClassModal } from './components/Modals/ScheduleClassModal';
 import { StaffManagementModal } from './components/Modals/StaffManagementModal';
 import { SecurityModal } from './components/Modals/SecurityModal';
+import { AdditionalTransactionModal } from './components/Modals/AdditionalTransactionModal';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { AuthUser } from './types';
 import { getCurrentSession, saveCurrentSession } from './utils/authUtils';
 import { ErrorBoundary } from './components/ErrorBoundary';
-
-const PROD_CLEAN_KEY = 'semillas_clean_prod_v5';
 
 export const App: React.FC = () => {
   // Authentication & Private Access Control
@@ -54,21 +54,15 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [selectedSede, setSelectedSede] = useState<SedeId | 'todas'>('todas');
 
-  // Persistence in LocalStorage - Starting clean for real production data entry
+  // Persistence in LocalStorage - Pure, safe persistence that never wipes user data
   const [students, setStudents] = useState<Student[]>(() => {
     try {
-      const hasCleaned = localStorage.getItem(PROD_CLEAN_KEY);
-      if (!hasCleaned) {
-        localStorage.setItem(PROD_CLEAN_KEY, 'true');
-        localStorage.setItem('semillas_students', JSON.stringify([]));
-        localStorage.setItem('semillas_payments', JSON.stringify([]));
-        localStorage.setItem('semillas_evaluations', JSON.stringify([]));
-        return [];
-      }
       const saved = localStorage.getItem('semillas_students');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return [];
     } catch {
       return [];
     }
@@ -76,12 +70,25 @@ export const App: React.FC = () => {
 
   const [payments, setPayments] = useState<PaymentRecord[]>(() => {
     try {
-      const hasCleaned = localStorage.getItem(PROD_CLEAN_KEY);
-      if (!hasCleaned) return [];
       const saved = localStorage.getItem('semillas_payments');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [additionalIncomes, setAdditionalIncomes] = useState<AdditionalIncomeRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('semillas_additional_incomes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return [];
     } catch {
       return [];
     }
@@ -89,12 +96,12 @@ export const App: React.FC = () => {
 
   const [evaluations, setEvaluations] = useState<FreeEvaluationAppointment[]>(() => {
     try {
-      const hasCleaned = localStorage.getItem(PROD_CLEAN_KEY);
-      if (!hasCleaned) return [];
       const saved = localStorage.getItem('semillas_evaluations');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return [];
     } catch {
       return [];
     }
@@ -103,9 +110,11 @@ export const App: React.FC = () => {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
     try {
       const saved = localStorage.getItem('semillas_expenses');
-      if (!saved) return INITIAL_EXPENSES;
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_EXPENSES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return INITIAL_EXPENSES;
     } catch {
       return INITIAL_EXPENSES;
     }
@@ -114,9 +123,11 @@ export const App: React.FC = () => {
   const [classes, setClasses] = useState<ScheduleClass[]>(() => {
     try {
       const saved = localStorage.getItem('semillas_classes');
-      if (!saved) return INITIAL_CLASSES;
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_CLASSES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return INITIAL_CLASSES;
     } catch {
       return INITIAL_CLASSES;
     }
@@ -125,9 +136,11 @@ export const App: React.FC = () => {
   const [staff, setStaff] = useState<StaffMember[]>(() => {
     try {
       const saved = localStorage.getItem('semillas_staff');
-      if (!saved) return INITIAL_STAFF;
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_STAFF;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return INITIAL_STAFF;
     } catch {
       return INITIAL_STAFF;
     }
@@ -136,15 +149,17 @@ export const App: React.FC = () => {
   const [templates, setTemplates] = useState<NotificationTemplate[]>(() => {
     try {
       const saved = localStorage.getItem('semillas_templates');
-      if (!saved) return INITIAL_TEMPLATES;
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_TEMPLATES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return INITIAL_TEMPLATES;
     } catch {
       return INITIAL_TEMPLATES;
     }
   });
 
-  // Save to LocalStorage
+  // Save to LocalStorage with direct persistence
   useEffect(() => {
     localStorage.setItem('semillas_students', JSON.stringify(students));
   }, [students]);
@@ -152,6 +167,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('semillas_payments', JSON.stringify(payments));
   }, [payments]);
+
+  useEffect(() => {
+    localStorage.setItem('semillas_additional_incomes', JSON.stringify(additionalIncomes));
+  }, [additionalIncomes]);
 
   useEffect(() => {
     localStorage.setItem('semillas_expenses', JSON.stringify(expenses));
@@ -177,6 +196,10 @@ export const App: React.FC = () => {
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentModalStudent, setPaymentModalStudent] = useState<Student | null>(null);
+
+  const [isAdditionalModalOpen, setIsAdditionalModalOpen] = useState(false);
+  const [additionalModalType, setAdditionalModalType] = useState<'income' | 'expense'>('income');
+  const [receiptAdditionalIncome, setReceiptAdditionalIncome] = useState<AdditionalIncomeRecord | null>(null);
 
   const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
   const [receiptStudent, setReceiptStudent] = useState<Student | null>(null);
@@ -280,7 +303,25 @@ export const App: React.FC = () => {
     setTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   };
 
-  // Expense Handlers
+  // Income and Expense Handlers
+  const handleSaveAdditionalIncome = (newIncome: AdditionalIncomeRecord) => {
+    setAdditionalIncomes((prev) => {
+      const exists = prev.some((i) => i.id === newIncome.id);
+      if (exists) {
+        return prev.map((i) => (i.id === newIncome.id ? newIncome : i));
+      }
+      return [newIncome, ...prev];
+    });
+  };
+
+  const handleDeleteAdditionalIncome = (id: string) => {
+    setAdditionalIncomes((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const handleDeletePayment = (paymentId: string) => {
+    setPayments((prev) => prev.filter((p) => p.id !== paymentId));
+  };
+
   const handleAddExpense = (expense: ExpenseRecord) => {
     setExpenses((prev) => [expense, ...prev]);
   };
@@ -295,10 +336,10 @@ export const App: React.FC = () => {
 
   // Reset and Export
   const handleResetData = () => {
-    if (confirm('¿Deseas reiniciar la base de datos a un estado completamente limpio para producción (sin alumnos de prueba)?')) {
-      localStorage.setItem(PROD_CLEAN_KEY, 'true');
+    if (confirm('¿Deseas reiniciar la base de datos a un estado limpio (sin alumnos ni registros de prueba)?')) {
       setStudents([]);
       setPayments([]);
+      setAdditionalIncomes([]);
       setExpenses(INITIAL_EXPENSES);
       setEvaluations([]);
       setClasses(INITIAL_CLASSES);
@@ -306,10 +347,11 @@ export const App: React.FC = () => {
       setTemplates(INITIAL_TEMPLATES);
       localStorage.setItem('semillas_students', JSON.stringify([]));
       localStorage.setItem('semillas_payments', JSON.stringify([]));
+      localStorage.setItem('semillas_additional_incomes', JSON.stringify([]));
       localStorage.setItem('semillas_expenses', JSON.stringify(INITIAL_EXPENSES));
       localStorage.setItem('semillas_evaluations', JSON.stringify([]));
       localStorage.setItem('semillas_classes', JSON.stringify(INITIAL_CLASSES));
-      alert('Sistema preparado. La lista de alumnos y pagos ha sido limpiada para tu uso real.');
+      alert('Sistema preparado. La base de datos está lista para tu gestión.');
     }
   };
 
@@ -319,6 +361,7 @@ export const App: React.FC = () => {
       exportedAt: new Date().toISOString(),
       students,
       payments,
+      additionalIncomes,
       expenses,
       evaluations,
       classes,
@@ -335,7 +378,7 @@ export const App: React.FC = () => {
   };
 
   const currentReceiptSede = INITIAL_SEDES.find(
-    (s) => s.id === (receiptStudent?.sede || 'mi_peru')
+    (s) => s.id === (receiptStudent?.sede || receiptAdditionalIncome?.sede || (selectedSede === 'todas' ? 'mi_peru' : selectedSede))
   ) || INITIAL_SEDES[0];
 
   const handleLoginSuccess = (user: AuthUser) => {
@@ -386,6 +429,7 @@ export const App: React.FC = () => {
               evaluations={evaluations}
               classes={classes}
               payments={payments}
+              additionalIncomes={additionalIncomes}
               expenses={expenses}
               staff={staff}
               selectedSede={selectedSede}
@@ -479,16 +523,31 @@ export const App: React.FC = () => {
             <PaymentsModule
               students={students}
               payments={payments}
+              additionalIncomes={additionalIncomes}
+              expenses={expenses}
               selectedSede={selectedSede}
               sedes={INITIAL_SEDES}
               onOpenPaymentModal={(st) => {
                 setPaymentModalStudent(st || null);
                 setIsPaymentModalOpen(true);
               }}
+              onOpenAdditionalModal={(defaultType) => {
+                setAdditionalModalType(defaultType || 'income');
+                setIsAdditionalModalOpen(true);
+              }}
               onOpenReceipt={(pay, st) => {
+                setReceiptAdditionalIncome(null);
                 setReceiptPayment(pay);
                 setReceiptStudent(st || students.find((s) => s.id === pay.studentId) || null);
               }}
+              onOpenIncomeReceipt={(inc) => {
+                setReceiptPayment(null);
+                setReceiptStudent(null);
+                setReceiptAdditionalIncome(inc);
+              }}
+              onDeletePayment={handleDeletePayment}
+              onDeleteAdditionalIncome={handleDeleteAdditionalIncome}
+              onDeleteExpense={handleDeleteExpense}
               onSelectStudent={(st) => setSelectedStudentDetail(st)}
               onBackToHall={() => setActiveTab('dashboard')}
               onNavigateTab={setActiveTab}
@@ -599,13 +658,26 @@ export const App: React.FC = () => {
           <ReceiptModal
             payment={receiptPayment}
             student={receiptStudent}
+            additionalIncome={receiptAdditionalIncome}
             sede={currentReceiptSede}
             onClose={() => {
               setReceiptPayment(null);
               setReceiptStudent(null);
+              setReceiptAdditionalIncome(null);
             }}
           />
         </ErrorBoundary>
+
+        {/* 5.1 Additional Income & Cash Outflow Modal */}
+        <AdditionalTransactionModal
+          isOpen={isAdditionalModalOpen}
+          onClose={() => setIsAdditionalModalOpen(false)}
+          defaultType={additionalModalType}
+          selectedSede={selectedSede}
+          sedes={INITIAL_SEDES}
+          onSaveIncome={handleSaveAdditionalIncome}
+          onSaveExpense={handleAddExpense}
+        />
 
         {/* 6. Free Trial Evaluation Modal */}
         <EvaluationModal

@@ -1,13 +1,30 @@
 import React, { useState } from 'react';
-import { PaymentRecord, Student, Sede } from '../../types';
+import { PaymentRecord, Student, Sede, AdditionalIncomeRecord } from '../../types';
 import { formatSoles, getCleanPhone } from '../../utils/dateUtils';
 import { LogoSemillas } from '../LogoSemillas';
-import { X, Printer, Download, Share2, CheckCircle, Image as ImageIcon, Loader2, Copy, Check } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { 
+  X, 
+  Printer, 
+  Download, 
+  Share2, 
+  CheckCircle, 
+  Image as ImageIcon, 
+  Loader2, 
+  Copy, 
+  Check, 
+  FileText 
+} from 'lucide-react';
+import { 
+  ReceiptData, 
+  downloadReceiptImage, 
+  downloadReceiptPdf, 
+  printReceipt 
+} from '../../utils/receiptGenerator';
 
 interface ReceiptModalProps {
   payment: PaymentRecord | null;
   student: Student | null;
+  additionalIncome?: AdditionalIncomeRecord | null;
   sede: Sede | null;
   onClose: () => void;
 }
@@ -15,75 +32,95 @@ interface ReceiptModalProps {
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   payment,
   student,
+  additionalIncome,
   sede,
   onClose,
 }) => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
 
-  if (!payment) return null;
+  if (!payment && !additionalIncome) return null;
 
   // Safe data extraction with robust fallbacks to prevent any possible crash
-  const paymentAmount = Number(payment.amount) || 0;
-  const studentName = payment.studentName || student?.fullName || 'Alumno Matriculado';
-  const paymentConcept = payment.concept || 'Mensualidad Institucional';
-  const paymentDate = payment.date || new Date().toISOString().split('T')[0];
-  const paymentMethod = payment.paymentMethod || 'Efectivo';
-  const receivedBy = payment.receivedBy || 'Recepción y Caja';
-  const paymentNotes = payment.notes || '';
+  const paymentAmount = payment ? (Number(payment.amount) || 0) : (Number(additionalIncome?.amount) || 0);
+  const studentName = payment 
+    ? (payment.studentName || student?.fullName || 'Alumno Matriculado')
+    : (additionalIncome?.payerName || 'Cliente / Apoderado');
+  const paymentConcept = payment 
+    ? (payment.concept || 'Mensualidad Institucional')
+    : (additionalIncome?.concept || 'Ingreso Adicional de Caja');
+  const paymentDate = payment 
+    ? (payment.date || new Date().toISOString().split('T')[0])
+    : (additionalIncome?.date || new Date().toISOString().split('T')[0]);
+  const paymentMethod = payment ? payment.paymentMethod : (additionalIncome?.paymentMethod || 'Efectivo');
+  const receivedBy = payment ? payment.receivedBy : (additionalIncome?.receivedBy || 'Recepción y Caja');
+  const paymentNotes = payment ? (payment.notes || '') : (additionalIncome?.notes || '');
   
-  const receiptIdStr = String(payment.id || '');
-  const receiptNum = payment.referenceNumber || (receiptIdStr ? `REC-${receiptIdStr.slice(-6).toUpperCase()}` : 'REC-0001');
+  const receiptIdStr = String(payment ? payment.id : (additionalIncome?.id || ''));
+  const receiptNum = (payment ? payment.referenceNumber : additionalIncome?.referenceNumber) || 
+    (receiptIdStr ? `REC-${receiptIdStr.slice(-6).toUpperCase()}` : 'REC-0001');
 
   const sedeName = sede?.name || (paymentNotes.toLowerCase().includes('ventanilla') ? 'Sede Ventanilla (Deporte)' : 'Sede Principal (Mi Perú)');
   const sedeAddress = sede?.address || 'Av. Trujillo Mz. B Lt. 14, Distrito de Mi Perú, Callao';
   const sedePhone = sede?.phone || '987 654 321';
 
-  const handlePrint = () => {
-    try {
-      window.print();
-    } catch (err) {
-      console.warn('Impresión directa no disponible en este entorno:', err);
-      alert('La vista previa no permite impresión directa. Te recomendamos usar el botón "Descargar Imagen (PNG)".');
-    }
+  const receiptData: ReceiptData = {
+    receiptNum,
+    paymentDate,
+    studentName,
+    studentDni: student?.dni,
+    guardianName: student?.guardianName,
+    guardianRelation: student?.guardianRelation,
+    studentProgram: student?.program ? `${student.program}${student.subProgram ? ` - ${student.subProgram}` : ''}` : undefined,
+    paymentConcept,
+    paymentAmount,
+    paymentMethod,
+    receivedBy,
+    paymentNotes,
+    sedeName,
+    sedeAddress,
+    sedePhone,
   };
 
   const handleDownloadImage = async () => {
-    const element = document.getElementById('printable-receipt-area');
-    if (!element) {
-      alert('No se pudo encontrar el comprobante para generar la imagen.');
-      return;
-    }
-
     try {
       setIsGeneratingImage(true);
-      setDownloadSuccess(false);
-
-      const canvas = await html2canvas(element, {
-        scale: 2.2, // Crisp retina resolution
-        useCORS: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-      });
-
-      const image = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      const safeStudentName = studentName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'alumno';
-      const safeNum = receiptNum.replace(/[^\w-]/g, '');
-      link.href = image;
-      link.download = `Recibo-Semillas-${safeNum}-${safeStudentName}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 4000);
+      setDownloadSuccessMsg(null);
+      await downloadReceiptImage(receiptData);
+      setDownloadSuccessMsg('✓ Imagen PNG descargada con el Sello Oficial.');
+      setTimeout(() => setDownloadSuccessMsg(null), 4000);
     } catch (err) {
       console.error('Error al generar la imagen del recibo:', err);
-      alert('Hubo un inconveniente al generar la imagen. Puedes usar la opción de Copiar Texto o Imprimir / PDF.');
+      alert('Hubo un error al generar la imagen. Puedes usar la opción de Descargar PDF o Copiar Texto.');
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      setDownloadSuccessMsg(null);
+      await downloadReceiptPdf(receiptData);
+      setDownloadSuccessMsg('✓ Documento PDF oficial descargado correctamente.');
+      setTimeout(() => setDownloadSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Error al generar el PDF del recibo:', err);
+      alert('Hubo un error al generar el PDF. Puedes descargar la imagen PNG o Copiar Texto.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    try {
+      await printReceipt(receiptData);
+    } catch (err) {
+      console.warn('Impresión directa no disponible:', err);
+      // Fallback: download PDF directly
+      await handleDownloadPdf();
     }
   };
 
@@ -128,13 +165,28 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     >
       <div className="bg-white rounded-3xl shadow-2xl border border-[#E5DFD4] w-full max-w-lg overflow-hidden my-4 animate-in fade-in zoom-in-95 duration-150">
         {/* Top actions bar (non-printable) */}
-        <div className="bg-[#FAF7F2] px-5 py-3 border-b border-[#EFE8DF] flex items-center justify-between print:hidden">
+        <div className="bg-[#FAF7F2] px-4 sm:px-5 py-3 border-b border-[#EFE8DF] flex flex-wrap items-center justify-between gap-2 print:hidden">
           <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
             <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="truncate">Pago Registrado • Recibo Oficial</span>
+            <span className="truncate">Comprobante Oficial N° {receiptNum}</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Descargar este recibo oficial en documento PDF"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileText className="w-3.5 h-3.5" />
+              )}
+              <span>{isGeneratingPdf ? 'Generando...' : 'Descargar PDF'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleDownloadImage}
@@ -154,10 +206,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               type="button"
               onClick={handlePrint}
               className="flex items-center gap-1.5 text-xs font-semibold bg-white hover:bg-[#F2EDE4] text-[#332E27] border border-[#DDD5CA] px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
-              title="Imprimir o guardar como PDF"
+              title="Imprimir comprobante"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Imprimir / PDF</span>
+              <span className="hidden sm:inline">Imprimir</span>
             </button>
 
             <button
@@ -171,9 +223,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
         </div>
 
-        {downloadSuccess && (
+        {downloadSuccessMsg && (
           <div className="bg-emerald-50 text-emerald-800 text-xs px-4 py-2 border-b border-emerald-200 flex items-center justify-between">
-            <span>✓ Imagen descargada con el Sello Oficial de Semillas del Reino.</span>
+            <span className="font-semibold">{downloadSuccessMsg}</span>
             <button
               type="button"
               onClick={handleShareWhatsApp}
@@ -381,7 +433,17 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>{isGeneratingPdf ? 'Generando PDF...' : 'Descargar PDF'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleDownloadImage}
@@ -389,7 +451,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               className="flex items-center gap-1.5 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50"
             >
               <ImageIcon className="w-3.5 h-3.5" />
-              <span>{isGeneratingImage ? 'Descargando...' : 'Descargar Imagen'}</span>
+              <span>{isGeneratingImage ? 'Descargando...' : 'Descargar Imagen (PNG)'}</span>
             </button>
 
             <button

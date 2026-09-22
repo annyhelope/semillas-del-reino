@@ -39,6 +39,30 @@ export type ExpenseCategory =
   | 'mantenimiento'
   | 'otros';
 
+export type AdditionalIncomeCategory =
+  | 'uniformes'
+  | 'materiales'
+  | 'talleres'
+  | 'alquiler_espacio'
+  | 'eventos'
+  | 'certificados'
+  | 'otros';
+
+export interface AdditionalIncomeRecord {
+  id: string;
+  concept: string;
+  category: AdditionalIncomeCategory;
+  amount: number;
+  date: string;
+  sede: SedeId;
+  paymentMethod: PaymentMethod;
+  payerName: string;
+  referenceNumber?: string;
+  receivedBy: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface ExpenseRecord {
   id: string;
   category: ExpenseCategory;
